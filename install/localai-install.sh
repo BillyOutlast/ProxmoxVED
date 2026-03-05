@@ -34,7 +34,7 @@ install -m 755 "$localai_binary" /usr/local/bin/local-ai
 
 tr -d '\n' <~/.localai >/opt/localai_version.txt
 
-if lspci | grep -qE '(VGA|3D controller).*[(1002|1022):'; then  msg_info "Installing ROCm"
+if lspci | grep -qE 'VGA|3D controller.*AMD'; then  msg_info "Installing ROCm"
   export DEBIAN_FRONTEND=noninteractive
 
   mkdir -p /etc/apt/keyrings
