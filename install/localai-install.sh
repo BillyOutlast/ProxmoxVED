@@ -26,18 +26,11 @@ if [[ -z "$localai_binary" ]]; then
   exit 1
 fi
 
-install -m 755 "$localai_binary" /usr/local/bin/local-ai || {
-  msg_error "Failed to install LocalAI binary"
-  exit 1
-}
+install -m 755 "$localai_binary" /usr/local/bin/local-ai
 
-if [[ -f ~/.localai ]]; then
-  tr -d '\n' <~/.localai >/opt/localai_version.txt || {
-    msg_warn "Failed to create version file"
-  }
-fi
+tr -d '\n' <~/.localai >/opt/localai_version.txt
 
-if grep -qE '(VGA|3D controller|Display controller).*\[1002:'; then
+if grep -qE '(VGA|3D controller).*\[(1002|1022):'; then
   msg_info "Installing ROCm"
   export DEBIAN_FRONTEND=noninteractive
 
