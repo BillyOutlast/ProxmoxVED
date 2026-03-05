@@ -18,7 +18,6 @@ msg_info "Installing Dependencies"
 $STD apt install -y pciutils
 msg_ok "Installed Dependencies"
 
-# Enhanced binary download with better error handling
 fetch_and_deploy_gh_release "localai" "mudler/LocalAI" "singlefile" "latest" "/opt/localai-bin" "local-ai-v*-linux-amd64"
 
 localai_binary="$(find /opt/localai-bin -maxdepth 1 -type f -name 'local-ai-v*-linux-amd64' | sort | tail -n1)"
@@ -27,7 +26,6 @@ if [[ -z "$localai_binary" ]]; then
   exit 1
 fi
 
-# Install the binary with better error handling
 install -m 755 "$localai_binary" /usr/local/bin/local-ai || {
   msg_error "Failed to install LocalAI binary"
   exit 1
@@ -39,7 +37,6 @@ if [[ -f ~/.localai ]]; then
   }
 fi
 
-# Enhanced GPU detection and ROCm installation
 if grep -qE '(VGA|3D controller|Display controller).*\[1002:'; then
   msg_info "Installing ROCm"
   export DEBIAN_FRONTEND=noninteractive
@@ -59,7 +56,6 @@ if grep -qE '(VGA|3D controller|Display controller).*\[1002:'; then
     return 1
   }
 
-  # Add better error handling for repository setup
   mkdir -p /etc/apt/keyrings
   
   # Try multiple approaches to get the ROCm key
@@ -81,7 +77,6 @@ Pin: release o=repo.radeon.com
 Pin-Priority: 600
 EOF
 
-  # Update package lists and install ROCm with better error handling
   apt-get update -o Acquire::Retries=3 >/dev/null 2>&1 || {
     msg_error "Failed to update package lists for ROCm installation"
     exit 1
