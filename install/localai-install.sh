@@ -34,7 +34,6 @@ install -m 755 "$localai_binary" /usr/local/bin/local-ai
 
 tr -d '\n' <~/.localai >/opt/localai_version.txt
 
-msg_info "Checking for GPU"
 if lspci | grep -qE '(VGA|3D controller).*[(1002|1022):'; then  msg_info "Installing ROCm"
   export DEBIAN_FRONTEND=noninteractive
 
