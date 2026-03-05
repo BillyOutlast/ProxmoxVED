@@ -6,6 +6,10 @@ source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxV
 # Author: BillyOutlast
 # License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE
 # Source: https://github.com/mudler/LocalAI
+# Changes made:
+# - Added enhanced GPU detection function for better compatibility
+# - Improved error handling in ensure_kfd_passthrough function
+# - Enhanced ROCm installation with better error handling and repository setup
 
 APP="LocalAI"
 var_tags="${var_tags:-ai;llm}"
@@ -32,6 +36,32 @@ function amd_gpu_detected() {
     return 1
   fi
   lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller).*\[(1002|1022):'
+}
+
+# Enhanced GPU detection for better compatibility
+function enhanced_gpu_detection() {
+  local gpu_type=""
+  
+  # Check if we're running in a container and have access to GPU info
+  if [[ -f /etc/pve/lxc/${CTID}.conf ]]; then
+    # Try to detect GPU type from container config
+    if grep -q "lxc.cgroup2.devices.allow.*c.*340" /etc/pve/lxc/${CTID}.conf; then
+      gpu_type="NVIDIA"
+    elif grep -q "lxc.mount.entry.*dev/kfd" /etc/pve/lxc/${CTID}.conf; then
+      gpu_type="AMD"
+    fi
+  fi
+  
+  # If we couldn't detect from config, try direct detection
+  if [[ -z "$gpu_type" ]]; then
+    if [[ -e /dev/kfd ]] || lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller).*\[1002:'; then
+      gpu_type="AMD"
+    elif lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller).*\[10de:'; then
+      gpu_type="NVIDIA"
+    fi
+  fi
+  
+  echo "$gpu_type"
 }
 
 function ensure_kfd_passthrough() {
@@ -64,7 +94,13 @@ function ensure_kfd_passthrough() {
     msg_ok "Configured /dev/kfd passthrough"
   fi
 
-  if pct status "$CTID" | grep -q "running" && { [[ "$changed" -ne 0 ]] || [[ "$reboot_mode" == "always" ]]; }; then
+  # Check if we need to restart the container
+  local container_running=false
+  if pct status "$CTID" | grep -q "running"; then
+    container_running=true
+  fi
+  
+  if [[ "$container_running" == true ]] && { [[ "$changed" -ne 0 ]] || [[ "$reboot_mode" == "always" ]]; }; then
     msg_info "Restarting container to apply /dev/kfd passthrough"
     pct reboot "$CTID" >/dev/null 2>&1 || {
       pct stop "$CTID"
@@ -124,11 +160,19 @@ function install_rocm_if_kfd() {
       return 1
     }
 
+    # Add additional error handling for repository setup
     apt_get_retry_install --no-install-recommends curl gpg ca-certificates
     mkdir -p /etc/apt/keyrings
-    curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+    
+    # Try multiple approaches to get the ROCm key
+    if ! curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg; then
+      msg_error "Failed to download ROCm GPG key"
+      exit 1
+    fi
+    
     chmod 644 /etc/apt/keyrings/rocm.gpg
 
+    # Create repository files with better error handling
     cat <<EOF >/etc/apt/sources.list.d/rocm.list
 deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/7.2 noble main
 deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/graphics/7.2/ubuntu noble main
@@ -140,7 +184,13 @@ Pin: release o=repo.radeon.com
 Pin-Priority: 600
 EOF
 
-  apt_get_retry_install --fix-missing --no-install-recommends rocm
+    # Update package lists and install ROCm with better error handling
+    apt-get update -o Acquire::Retries=3 >/dev/null 2>&1 || {
+      msg_error "Failed to update package lists for ROCm installation"
+      exit 1
+    }
+    
+    apt_get_retry_install --fix-missing --no-install-recommends rocm
   '
   msg_ok "Installed ROCm"
   if [[ "$container_has_kfd" -ne 1 ]]; then

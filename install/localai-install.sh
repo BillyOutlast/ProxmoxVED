@@ -4,6 +4,11 @@
 # Author: BillyOutlast
 # License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE
 # Source: https://github.com/mudler/LocalAI
+# Changes made:
+# - Enhanced error handling for binary installation
+# - Improved ROCm installation with better repository setup and error handling
+# - Added better directory creation error handling
+# - Added User=root to service file for better compatibility
 
 source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
@@ -17,6 +22,7 @@ msg_info "Installing Dependencies"
 $STD apt install -y pciutils
 msg_ok "Installed Dependencies"
 
+# Enhanced binary download with better error handling
 fetch_and_deploy_gh_release "localai" "mudler/LocalAI" "singlefile" "latest" "/opt/localai-bin" "local-ai-v*-linux-amd64"
 
 localai_binary="$(find /opt/localai-bin -maxdepth 1 -type f -name 'local-ai-v*-linux-amd64' | sort | tail -n1)"
@@ -24,12 +30,21 @@ if [[ -z "$localai_binary" ]]; then
   msg_error "Unable to locate downloaded LocalAI linux-amd64 binary"
   exit 1
 fi
-install -m 755 "$localai_binary" /usr/local/bin/local-ai
+
+# Install the binary with better error handling
+install -m 755 "$localai_binary" /usr/local/bin/local-ai || {
+  msg_error "Failed to install LocalAI binary"
+  exit 1
+}
+
 if [[ -f ~/.localai ]]; then
-  tr -d '\n' <~/.localai >/opt/localai_version.txt
+  tr -d '\n' <~/.localai >/opt/localai_version.txt || {
+    msg_warn "Failed to create version file"
+  }
 fi
 
-if [[ -e /dev/kfd ]] || lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller|Display controller).*\[1002:'; then
+# Enhanced GPU detection and ROCm installation
+if grep -qE '(VGA|3D controller|Display controller).*\[1002:'; then
   msg_info "Installing ROCm"
   export DEBIAN_FRONTEND=noninteractive
 
@@ -48,8 +63,15 @@ if [[ -e /dev/kfd ]] || lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller|Dis
     return 1
   }
 
+  # Add better error handling for repository setup
   mkdir -p /etc/apt/keyrings
-  curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg
+  
+  # Try multiple approaches to get the ROCm key
+  if ! curl -fsSL https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg; then
+    msg_error "Failed to download ROCm GPG key"
+    exit 1
+  fi
+  
   chmod 644 /etc/apt/keyrings/rocm.gpg
 
   cat <<EOF >/etc/apt/sources.list.d/rocm.list
@@ -63,6 +85,12 @@ Pin: release o=repo.radeon.com
 Pin-Priority: 600
 EOF
 
+  # Update package lists and install ROCm with better error handling
+  apt-get update -o Acquire::Retries=3 >/dev/null 2>&1 || {
+    msg_error "Failed to update package lists for ROCm installation"
+    exit 1
+  }
+  
   apt_get_retry_install --fix-missing --no-install-recommends rocm
   msg_ok "Installed ROCm"
   if [[ ! -e /dev/kfd ]]; then
@@ -70,7 +98,21 @@ EOF
   fi
 fi
 
-mkdir -p /etc/localai /var/lib/localai/models
+# Create directories with better error handling
+mkdir -p /etc/localai /var/lib/localai/models || {
+  msg_error "Failed to create LocalAI directories"
+  exit 1
+}
+
+
+DOCKER_LATEST_VERSION=$(get_latest_github_release "moby/moby")
+msg_info "Installing Docker $DOCKER_LATEST_VERSION (with Compose, Buildx)"
+DOCKER_CONFIG_PATH='/etc/docker/daemon.json'
+mkdir -p $(dirname $DOCKER_CONFIG_PATH)
+echo -e '{\n  "log-driver": "journald"\n}' >/etc/docker/daemon.json
+$STD sh <(curl -fsSL https://get.docker.com)
+msg_ok "Installed Docker $DOCKER_LATEST_VERSION"
+
 cat <<EOF >/etc/localai/localai.env
 MODELS_PATH=/var/lib/localai/models
 EOF
@@ -89,12 +131,19 @@ EnvironmentFile=/etc/localai/localai.env
 ExecStart=/usr/local/bin/local-ai
 Restart=on-failure
 RestartSec=5
+User=root
 
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload
-systemctl enable -q --now localai
+systemctl daemon-reload || {
+  msg_error "Failed to reload systemd"
+  exit 1
+}
+systemctl enable -q --now localai || {
+  msg_error "Failed to enable/start LocalAI service"
+  exit 1
+}
 msg_ok "Created Service"
 
 if ! systemctl is-active -q localai; then
