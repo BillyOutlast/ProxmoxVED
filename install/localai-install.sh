@@ -18,13 +18,13 @@ msg_info "Installing Dependencies"
 $STD apt install -y pciutils
 msg_ok "Installed Dependencies"
 
-fetch_and_deploy_gh_release "localai" "mudler/LocalAI" "singlefile" "latest" "/opt/localai-bin" "localai"
+fetch_and_deploy_gh_release "localai" "mudler/LocalAI" "singlefile" "latest" "/opt/localai-bin" "local-ai-v*-linux-amd64"
 
 # Debug: List files in /opt/localai-bin after fetch
 echo "Files in /opt/localai-bin after fetch:" >&2
 ls -l /opt/localai-bin >&2
 
-localai_binary="$(find /opt/localai-bin -maxdepth 1 -type f -name 'localai' | sort | tail -n1)"
+localai_binary="$(find /opt/localai-bin -maxdepth 1 -type f -name 'local-ai-v*-linux-amd64' | sort | tail -n1)"
 if [[ -z "$localai_binary" ]]; then
   msg_error "Unable to locate downloaded LocalAI linux-amd64 binary"
   exit 1
