@@ -105,21 +105,11 @@ User=root
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload || {
-  msg_error "Failed to reload systemd"
-  exit 1
-}
-systemctl enable -q --now localai || {
-  msg_error "Failed to enable/start LocalAI service"
-  exit 1
-}
-msg_ok "Created Service"
+systemctl daemon-reload
 
-if ! systemctl is-active -q localai; then
-  msg_error "Failed to start LocalAI service"
-  exit 1
-fi
-msg_ok "Started LocalAI"
+systemctl enable -q --now localai
+
+msg_ok "Enabled and Started LocalAI Service"
 
 motd_ssh
 customize
