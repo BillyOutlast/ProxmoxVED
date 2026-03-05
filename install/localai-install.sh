@@ -41,21 +41,6 @@ if grep -qE '(VGA|3D controller|Display controller).*\[1002:'; then
   msg_info "Installing ROCm"
   export DEBIAN_FRONTEND=noninteractive
 
-  apt_get_retry_install() {
-    local args="$*"
-    local attempt
-    for attempt in 1 2 3; do
-      apt-get -qq -o Dpkg::Use-Pty=0 -o Acquire::Retries=5 -o Acquire::http::No-Cache=true -o Acquire::https::No-Cache=true update >/dev/null 2>&1 && \
-        apt-get -qq -o Dpkg::Use-Pty=0 -o Acquire::Retries=5 install -y $args >/dev/null 2>&1 && return 0
-      apt-get clean || true
-      rm -rf /var/lib/apt/lists/* || true
-      if [[ "$attempt" -lt 3 ]]; then
-        sleep 5
-      fi
-    done
-    return 1
-  }
-
   mkdir -p /etc/apt/keyrings
   
   # Try multiple approaches to get the ROCm key
@@ -82,15 +67,11 @@ EOF
     exit 1
   }
   
-  apt_get_retry_install --fix-missing --no-install-recommends rocm
+  apt --fix-missing --no-install-recommends rocm
   msg_ok "Installed ROCm"
 fi
 
-# Create directories with better error handling
-mkdir -p /etc/localai /var/lib/localai/models || {
-  msg_error "Failed to create LocalAI directories"
-  exit 1
-}
+mkdir -p /etc/localai /var/lib/localai/models
 
 
 DOCKER_LATEST_VERSION=$(get_latest_github_release "moby/moby")
