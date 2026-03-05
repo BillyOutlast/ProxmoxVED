@@ -6,10 +6,6 @@ source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxV
 # Author: BillyOutlast
 # License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE
 # Source: https://github.com/mudler/LocalAI
-# Changes made:
-# - Added enhanced GPU detection function for better compatibility
-# - Improved error handling in ensure_kfd_passthrough function
-# - Enhanced ROCm installation with better error handling and repository setup
 
 APP="LocalAI"
 var_tags="${var_tags:-ai;llm}"
@@ -38,13 +34,10 @@ function amd_gpu_detected() {
   lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller).*\[(1002|1022):'
 }
 
-# Enhanced GPU detection for better compatibility
 function enhanced_gpu_detection() {
   local gpu_type=""
   
-  # Check if we're running in a container and have access to GPU info
   if [[ -f /etc/pve/lxc/${CTID}.conf ]]; then
-    # Try to detect GPU type from container config
     if grep -q "lxc.cgroup2.devices.allow.*c.*340" /etc/pve/lxc/${CTID}.conf; then
       gpu_type="NVIDIA"
     elif grep -q "lxc.mount.entry.*dev/kfd" /etc/pve/lxc/${CTID}.conf; then
@@ -52,7 +45,6 @@ function enhanced_gpu_detection() {
     fi
   fi
   
-  # If we couldn't detect from config, try direct detection
   if [[ -z "$gpu_type" ]]; then
     if [[ -e /dev/kfd ]] || lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller).*\[1002:'; then
       gpu_type="AMD"
@@ -94,7 +86,6 @@ function ensure_kfd_passthrough() {
     msg_ok "Configured /dev/kfd passthrough"
   fi
 
-  # Check if we need to restart the container
   local container_running=false
   if pct status "$CTID" | grep -q "running"; then
     container_running=true

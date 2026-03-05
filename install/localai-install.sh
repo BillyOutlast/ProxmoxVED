@@ -4,11 +4,7 @@
 # Author: BillyOutlast
 # License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE
 # Source: https://github.com/mudler/LocalAI
-# Changes made:
-# - Enhanced error handling for binary installation
-# - Improved ROCm installation with better repository setup and error handling
-# - Added better directory creation error handling
-# - Added User=root to service file for better compatibility
+
 
 source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
@@ -93,9 +89,6 @@ EOF
   
   apt_get_retry_install --fix-missing --no-install-recommends rocm
   msg_ok "Installed ROCm"
-  if [[ ! -e /dev/kfd ]]; then
-    msg_warn "ROCm installed without /dev/kfd; add /dev/kfd passthrough and restart container for GPU acceleration"
-  fi
 fi
 
 # Create directories with better error handling
