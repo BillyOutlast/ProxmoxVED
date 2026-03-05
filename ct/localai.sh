@@ -24,17 +24,6 @@ variables
 color
 catch_errors
 
-function amd_gpu_detected() {
-  if [[ "${GPU_TYPE:-}" == "AMD" ]]; then
-    return 0
-  fi
-  if ! command -v lspci >/dev/null 2>&1; then
-    return 1
-  fi
-  lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller).*\[(1002|1022):'
-}
-
-
 function update_script() {
   header_info
   check_container_storage
