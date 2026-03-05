@@ -14,38 +14,11 @@ network_check
 update_os
 
 msg_info "Installing Dependencies"
-$STD apt install -y \
-  curl \
-  ca-certificates \
-  jq \
-  gpg \
-  pciutils
+$STD apt install -y pciutils
 msg_ok "Installed Dependencies"
-
-msg_info "Installing Docker"
-
-$STD apt update
-$STD apt install -y ca-certificates curl
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-
-cat <<EOF >/etc/apt/sources.list.d/docker.sources
-Types: deb
-URIs: https://download.docker.com/linux/debian
-Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
-Components: stable
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-
-$STD apt update
-$STD apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-systemctl enable -q --now docker
-msg_ok "Installed Docker"
 
 fetch_and_deploy_gh_release "localai" "mudler/LocalAI" "singlefile" "latest" "/opt/localai-bin" "local-ai-v*-linux-amd64"
 
-msg_info "Installing LocalAI Binary"
 localai_binary="$(find /opt/localai-bin -maxdepth 1 -type f -name 'local-ai-v*-linux-amd64' | sort | tail -n1)"
 if [[ -z "$localai_binary" ]]; then
   msg_error "Unable to locate downloaded LocalAI linux-amd64 binary"
@@ -55,7 +28,6 @@ install -m 755 "$localai_binary" /usr/local/bin/local-ai
 if [[ -f ~/.localai ]]; then
   tr -d '\n' <~/.localai >/opt/localai_version.txt
 fi
-msg_ok "Installed LocalAI Binary"
 
 if [[ -e /dev/kfd ]] || lspci -nn 2>/dev/null | grep -qE '(VGA|3D controller|Display controller).*\[1002:'; then
   msg_info "Installing ROCm"
